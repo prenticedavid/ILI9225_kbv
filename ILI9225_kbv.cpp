@@ -1,58 +1,36 @@
+#include <SPI.h>
 #include "ILI9225_kbv.h"
 //#include "serial_kbv.h"
 
-#define LED_PORT PORTC
-#define LED_PIN  0
-#define SCK_PORT PORTC
-#define SCK_PIN  1
-#define MOSI_PORT PORTC
-#define MOSI_PIN  2
-#define CD_PORT PORTC
-#define CD_PIN  3
-#define RESET_PORT PORTC
-#define RESET_PIN  4
-#define CS_PORT PORTC
-#define CS_PIN  5
-#define SPI_PORT PORTC
-
-#define CD_COMMAND PIN_LOW(CD_PORT, CD_PIN)
-#define CD_DATA    PIN_HIGH(CD_PORT, CD_PIN)
-#define CD_OUTPUT  PIN_OUTPUT(CD_PORT, CD_PIN)
-#define CS_ACTIVE  PIN_LOW(CS_PORT, CS_PIN);
-#define CS_IDLE    PIN_HIGH(CS_PORT, CS_PIN);
-#define CS_OUTPUT  PIN_OUTPUT(CS_PORT, CS_PIN)
-#define RESET_ACTIVE  PIN_LOW(RESET_PORT, RESET_PIN)
-#define RESET_IDLE    PIN_HIGH(RESET_PORT, RESET_PIN)
-#define RESET_OUTPUT  PIN_OUTPUT(RESET_PORT, RESET_PIN)
-#define SD_ACTIVE  PIN_LOW(SD_PORT, SD_PIN)
-#define SD_IDLE    PIN_HIGH(SD_PORT, SD_PIN)
-#define SD_OUTPUT  PIN_OUTPUT(SD_PORT, SD_PIN)
- // bit-bang macros for SDIO
-#define SCK_LO     PIN_LOW(SPI_PORT, SCK_PIN)
-#define SCK_HI     PIN_HIGH(SPI_PORT, SCK_PIN)
-#define SCK_OUT    PIN_OUTPUT(SPI_PORT, SCK_PIN)
-#define MOSI_LO    PIN_LOW(SPI_PORT, MOSI_PIN)
-#define MOSI_HI    PIN_HIGH(SPI_PORT, MOSI_PIN)
-#define MOSI_OUT   PIN_OUTPUT(SPI_PORT, MOSI_PIN)
-#define MOSI_IN    PIN_INPUT(SPI_PORT, MOSI_PIN)
-#define LED_LO     PIN_LOW(LED_PORT, LED_PIN)
-#define LED_HI     PIN_HIGH(LED_PORT, LED_PIN)
-#define LED_OUT    PIN_OUTPUT(LED_PORT, LED_PIN)
-
-#define INIT()  { CS_IDLE; RESET_IDLE; CS_OUTPUT; CD_OUTPUT; RESET_OUTPUT; MOSI_OUT; SCK_OUT; LED_OUT; LED_HI; }
-
-#define PIN_LOW(p, b)        (p) &= ~(1<<(b))
-#define PIN_HIGH(p, b)       (p) |= (1<<(b))
-#define PIN_OUTPUT(p, b)     *(&p-1) |= (1<<(b))
+#define CD_COMMAND digitalWrite(_dc, LOW)
+#define CD_DATA    digitalWrite(_dc, HIGH)
+#define CD_OUTPUT  pinMode(_dc, OUTPUT)
+#define CS_ACTIVE  digitalWrite(_cs, LOW)
+#define CS_IDLE    digitalWrite(_cs, HIGH)
+#define CS_OUTPUT  pinMode(_cs, OUTPUT)
+#define RESET_ACTIVE  digitalWrite(_rst, LOW)
+#define RESET_IDLE    digitalWrite(_rst, HIGH)
+#define RESET_OUTPUT  pinMode(_rst, OUTPUT)
+#define MOSI_LO  digitalWrite(_mosi, LOW)
+#define MOSI_HI    digitalWrite(_mosi, HIGH)
+#define MOSI_OUT  pinMode(_mosi, OUTPUT)
+#define SCK_LO  digitalWrite(_sclk, LOW)
+#define SCK_HI    digitalWrite(_sclk, HIGH)
+#define SCK_OUT  pinMode(_sclk, OUTPUT)
 
 #define WriteCmd(x)  { CD_COMMAND; xchg8_1(0); xchg8_1(x); CD_DATA; }
 #define WriteData(x)  { uint8_t hi = (x) >> 8, lo = (x); xchg8_1(hi); xchg8_1(lo); }
 
-static uint8_t _MC, _MP, _SC, _EC, _SP, _EP;
+static uint8_t _MC, _MP, _SC, _EC, _SP, _EP, _hwspi, _cs, _dc, _mosi, _sclk, _rst;
 
 static void xchg8_1(uint8_t c) 
 {
-    for(uint8_t bit = 0x80; bit; bit >>= 1) {
+    if (_hwspi) {
+		SPI.transfer(c);
+		return;
+	}
+#if 1
+	for(uint8_t bit = 0x80; bit; bit >>= 1) {
       if(c & bit) {
 	      MOSI_HI; 
       } else {
@@ -61,6 +39,7 @@ static void xchg8_1(uint8_t c)
 	  SCK_HI; 
 	  SCK_LO; 
     }
+#endif
 }
 
 static inline void write16_N(uint16_t color, int16_t n)
@@ -74,14 +53,33 @@ static inline void write16_N(uint16_t color, int16_t n)
 	}
 }
 
-ILI9225_kbv::ILI9225_kbv():Adafruit_GFX(176, 220)
+ILI9225_kbv::ILI9225_kbv(int8_t cs, int8_t dc, int8_t rst):Adafruit_GFX(176, 220)
 {
+    _cs = cs;
+	_dc = dc;
+	_rst = rst;
+	_hwspi = 1;
+}
+
+ILI9225_kbv::ILI9225_kbv(int8_t cs, int8_t dc, int8_t mosi, int8_t sclk, int8_t rst):Adafruit_GFX(176, 220)
+{
+    _cs = cs;
+	_dc = dc;
+	_mosi = mosi;
+	_sclk = sclk; 
+	_rst = rst;
+	_hwspi = 0;
 }
 
 void ILI9225_kbv::reset(void)
 {
-    INIT();
-    CS_IDLE;
+    { CS_IDLE; RESET_IDLE; CS_OUTPUT; CD_OUTPUT; RESET_OUTPUT; }
+    if (_hwspi) {
+		SPI.begin();
+    } else {
+		MOSI_OUT; SCK_OUT;
+	}
+	CS_IDLE;
     RESET_IDLE;
 	delay(50);
 	RESET_ACTIVE;

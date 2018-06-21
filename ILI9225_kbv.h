@@ -13,7 +13,8 @@
 class ILI9225_kbv : public Adafruit_GFX {
 
 	public:
-	ILI9225_kbv();
+	ILI9225_kbv(int8_t cs=10, int8_t dc=9, int8_t rst=8);
+	ILI9225_kbv(int8_t cs, int8_t dc, int8_t mosi, int8_t sclk, int8_t rst);
 	void     reset(void);                                       // you only need the constructor
 	void     begin(uint16_t ID = 0x9225);                                       // you only need the constructor
 	virtual void     drawPixel(int16_t x, int16_t y, uint16_t color);  // and these three
@@ -42,6 +43,7 @@ class ILI9225_kbv : public Adafruit_GFX {
 	
 	private:
 	uint16_t        _lcd_ID;
+//	int8_t          _mosi, _sclk, _rst;
 };
 
 #endif
