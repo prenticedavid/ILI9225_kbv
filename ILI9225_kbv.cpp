@@ -2,26 +2,60 @@
 #include "ILI9225_kbv.h"
 //#include "serial_kbv.h"
 
-#define CD_COMMAND digitalWrite(_dc, LOW)
-#define CD_DATA    digitalWrite(_dc, HIGH)
-#define CD_OUTPUT  pinMode(_dc, OUTPUT)
-#define CS_ACTIVE  digitalWrite(_cs, LOW)
-#define CS_IDLE    digitalWrite(_cs, HIGH)
-#define CS_OUTPUT  pinMode(_cs, OUTPUT)
-#define RESET_ACTIVE  digitalWrite(_rst, LOW)
-#define RESET_IDLE    digitalWrite(_rst, HIGH)
-#define RESET_OUTPUT  pinMode(_rst, OUTPUT)
-#define MOSI_LO  digitalWrite(_mosi, LOW)
-#define MOSI_HI    digitalWrite(_mosi, HIGH)
-#define MOSI_OUT  pinMode(_mosi, OUTPUT)
-#define SCK_LO  digitalWrite(_sclk, LOW)
-#define SCK_HI    digitalWrite(_sclk, HIGH)
-#define SCK_OUT  pinMode(_sclk, OUTPUT)
+#if 1
+// PASTE is awkward.   Not too difficult to write macros longhand
+#define PIN_OUTPUT(x) pinMode(x, OUTPUT)
+#define CD_COMMAND *_dcport &= ~_dcpinmask
+#define CD_DATA    *_dcport |= _dcpinmask
+#define CD_OUTPUT  PIN_OUTPUT(_dc)
+#define CS_ACTIVE  *_csport &= ~_cspinmask
+#define CS_IDLE    *_csport |= _cspinmask
+#define CS_OUTPUT  PIN_OUTPUT(_cs)
+#define RESET_ACTIVE  *_rstport &= ~_rstpinmask
+#define RESET_IDLE    *_rstport |= _rstpinmask
+#define RESET_OUTPUT  PIN_OUTPUT(_rst)
+#define SCK_LO     *_sclkport &= ~_sclkpinmask
+#define SCK_HI     *_sclkport |= _sclkpinmask
+#define SCK_OUT    PIN_OUTPUT(_sclk)
+#define MOSI_LO    *_mosiport &= ~_mosipinmask
+#define MOSI_HI    *_mosiport |= _mosipinmask
+#define MOSI_OUT   PIN_OUTPUT(_mosi)
+#else
+//#define PASTE(x, y) (x ## y)
+//#define PIN_LOW(x) *(PASTE(x, port)) &= ~(PASTE(x, pinmask))
+//#define PIN_HIGH(x) *(PASTE(x, port)) |= (PASTE(x, pinmask))
+#define PIN_LOW(x) digitalWrite(x, LOW)
+#define PIN_HIGH(x) digitalWrite(x, HIGH)
+#define PIN_OUTPUT(x) pinMode(x, OUTPUT)
+#define CD_COMMAND PIN_LOW(_dc)
+#define CD_DATA    PIN_HIGH(_dc)
+#define CD_OUTPUT  PIN_OUTPUT(_dc)
+#define CS_ACTIVE  PIN_LOW(_cs)
+#define CS_IDLE    PIN_HIGH(_cs)
+#define CS_OUTPUT  PIN_OUTPUT(_cs)
+#define RESET_ACTIVE  PIN_LOW(_rst)
+#define RESET_IDLE    PIN_HIGH(_rst)
+#define RESET_OUTPUT  PIN_OUTPUT(_rst)
+#define SCK_LO     PIN_LOW(_sclk)
+#define SCK_HI     PIN_HIGH(_sclk)
+#define SCK_OUT    PIN_OUTPUT(_sclk)
+#define MOSI_LO    PIN_LOW(_mosi)
+#define MOSI_HI    PIN_HIGH(_mosi)
+#define MOSI_OUT   PIN_OUTPUT(_mosi)
+#endif
 
 #define WriteCmd(x)  { CD_COMMAND; xchg8_1(0); xchg8_1(x); CD_DATA; }
 #define WriteData(x)  { uint8_t hi = (x) >> 8, lo = (x); xchg8_1(hi); xchg8_1(lo); }
 
-static uint8_t _MC, _MP, _SC, _EC, _SP, _EP, _hwspi, _cs, _dc, _mosi, _sclk, _rst;
+static uint8_t _MC, _MP, _SC, _EC, _SP, _EP, _hwspi;
+static uint8_t _cs, _dc, _mosi, _sclk, _rst;
+#ifdef __AVR__
+typedef uint8_t RwReg;
+#else
+typedef uint32_t RwReg;
+#endif
+static volatile RwReg *_csport, *_dcport, *_mosiport, *_sclkport, *_rstport;
+static RwReg   _cspinmask, _dcpinmask, _mosipinmask, _sclkpinmask, _rstpinmask;
 
 static void xchg8_1(uint8_t c) 
 {
@@ -59,6 +93,12 @@ ILI9225_kbv::ILI9225_kbv(int8_t cs, int8_t dc, int8_t rst):Adafruit_GFX(176, 220
 	_dc = dc;
 	_rst = rst;
 	_hwspi = 1;
+    _csport    = portOutputRegister(digitalPinToPort(_cs));
+    _cspinmask = digitalPinToBitMask(_cs);
+    _dcport    = portOutputRegister(digitalPinToPort(_dc));
+    _dcpinmask = digitalPinToBitMask(_dc);
+    _rstport    = portOutputRegister(digitalPinToPort(_rst));
+    _rstpinmask = digitalPinToBitMask(_rst);
 }
 
 ILI9225_kbv::ILI9225_kbv(int8_t cs, int8_t dc, int8_t mosi, int8_t sclk, int8_t rst):Adafruit_GFX(176, 220)
@@ -69,13 +109,24 @@ ILI9225_kbv::ILI9225_kbv(int8_t cs, int8_t dc, int8_t mosi, int8_t sclk, int8_t 
 	_sclk = sclk; 
 	_rst = rst;
 	_hwspi = 0;
+    _csport    = portOutputRegister(digitalPinToPort(_cs));
+    _cspinmask = digitalPinToBitMask(_cs);
+    _dcport    = portOutputRegister(digitalPinToPort(_dc));
+    _dcpinmask = digitalPinToBitMask(_dc);
+    _rstport    = portOutputRegister(digitalPinToPort(_rst));
+    _rstpinmask = digitalPinToBitMask(_rst);
+        _sclkport     = portOutputRegister(digitalPinToPort(_sclk));
+        _sclkpinmask  = digitalPinToBitMask(_sclk);
+        _mosiport    = portOutputRegister(digitalPinToPort(_mosi));
+        _mosipinmask = digitalPinToBitMask(_mosi);
 }
 
 void ILI9225_kbv::reset(void)
 {
     { CS_IDLE; RESET_IDLE; CS_OUTPUT; CD_OUTPUT; RESET_OUTPUT; }
     if (_hwspi) {
-		SPI.begin();
+		SPI.begin();  //needed for AVR
+		SPI.beginTransaction(SPISettings(24000000, MSBFIRST, SPI_MODE0));
     } else {
 		MOSI_OUT; SCK_OUT;
 	}
