@@ -1,19 +1,7 @@
 #include "ILI9225_kbv.h"
 //#include "serial_kbv.h"
 
-#define LED_PORT PORTC
-#define LED_PIN  0
-#define SCK_PORT PORTC
-#define SCK_PIN  1
-#define MOSI_PORT PORTC
-#define MOSI_PIN  2
-#define CD_PORT PORTC
-#define CD_PIN  3
-#define RESET_PORT PORTC
-#define RESET_PIN  4
-#define CS_PORT PORTC
-#define CS_PIN  5
-#define SPI_PORT PORTC
+#define USE_HWSPI 1
 
 #define CD_COMMAND PIN_LOW(CD_PORT, CD_PIN)
 #define CD_DATA    PIN_HIGH(CD_PORT, CD_PIN)
@@ -39,16 +27,50 @@
 #define LED_HI     PIN_HIGH(LED_PORT, LED_PIN)
 #define LED_OUT    PIN_OUTPUT(LED_PORT, LED_PIN)
 
-#define INIT()  { CS_IDLE; RESET_IDLE; CS_OUTPUT; CD_OUTPUT; RESET_OUTPUT; MOSI_OUT; SCK_OUT; LED_OUT; LED_HI; }
-
 #define PIN_LOW(p, b)        (p) &= ~(1<<(b))
 #define PIN_HIGH(p, b)       (p) |= (1<<(b))
 #define PIN_OUTPUT(p, b)     *(&p-1) |= (1<<(b))
 
-#define WriteCmd(x)  { CD_COMMAND; xchg8_1(0); xchg8_1(x); CD_DATA; }
-#define WriteData(x)  { uint8_t hi = (x) >> 8, lo = (x); xchg8_1(hi); xchg8_1(lo); }
+#if USE_HWSPI
+#include <SPI.h>
+static SPISettings settings(48000000, MSBFIRST, SPI_MODE0);
 
-static uint8_t _MC, _MP, _SC, _EC, _SP, _EP;
+//#define LED_PORT PORTC
+//#define LED_PIN  0
+#define SCK_PORT PORTB
+#define SCK_PIN  5
+#define MOSI_PORT PORTB
+#define MOSI_PIN  3
+#define CD_PORT PORTB
+#define CD_PIN  1
+#define RESET_PORT PORTB
+#define RESET_PIN  0
+#define CS_PORT PORTB
+#define CS_PIN  2
+#define SPI_PORT PORTB
+
+static volatile uint8_t xchg8_1(uint8_t c) 
+{
+	SPDR = c;
+	while ((SPSR & 0x80) == 0) ;
+	return SPDR;
+}
+
+#define HW_INIT()  { SPI.begin(); SPI.beginTransaction(settings); }
+#else
+#define LED_PORT PORTC
+#define LED_PIN  0
+#define SCK_PORT PORTC
+#define SCK_PIN  1
+#define MOSI_PORT PORTC
+#define MOSI_PIN  2
+#define CD_PORT PORTC
+#define CD_PIN  3
+#define RESET_PORT PORTC
+#define RESET_PIN  4
+#define CS_PORT PORTC
+#define CS_PIN  5
+#define SPI_PORT PORTC
 
 static void xchg8_1(uint8_t c) 
 {
@@ -62,6 +84,17 @@ static void xchg8_1(uint8_t c)
 	  SCK_LO; 
     }
 }
+#define HW_INIT()  { LED_OUT; LED_HI; }
+
+#endif
+
+#define GPIO_INIT() { CS_IDLE; RESET_IDLE; CS_OUTPUT; CD_OUTPUT; RESET_OUTPUT; MOSI_OUT; SCK_OUT; }
+#define INIT()      { GPIO_INIT(); HW_INIT(); }
+
+#define WriteCmd(x)  { CD_COMMAND; xchg8_1(0); xchg8_1(x); CD_DATA; }
+#define WriteData(x)  { uint8_t hi = (x) >> 8, lo = (x); xchg8_1(hi); xchg8_1(lo); }
+
+static uint8_t _MC, _MP, _SC, _EC, _SP, _EP;
 
 static inline void write16_N(uint16_t color, int16_t n)
 {
