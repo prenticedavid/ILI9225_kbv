@@ -17,7 +17,11 @@
 #include <SPI.h>          // f.k. for Arduino-1.5.2
 #include "Adafruit_GFX.h"// Hardware-specific library
 #include <ILI9225_kbv.h>
-ILI9225_kbv tft;
+
+ILI9225_kbv tft;       //hardware SPI default tft(10, 9, 8)
+//ILI9225_kbv tft(10, 9, 11, 13, 8); //software SPI.  no default.
+//ILI9225_kbv tft(A5, A3, A2, A1, A4); //software SPI.  no default.
+
 #define MCUFRIEND_KBV_H_ 100
 //#include <MCUFRIEND_kbv.h>
 //MCUFRIEND_kbv tft;
