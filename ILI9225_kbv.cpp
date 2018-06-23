@@ -48,7 +48,7 @@
 #define WriteData(x)  { uint8_t hi = (x) >> 8, lo = (x); xchg8_1(hi); xchg8_1(lo); }
 
 static uint8_t _MC, _MP, _SC, _EC, _SP, _EP, _hwspi;
-static uint8_t _cs, _dc, _mosi, _sclk, _rst;
+static uint8_t _cs, _dc, _mosi, _sclk, _rst, _led;
 #ifdef __AVR__
 typedef uint8_t RwReg;
 #else
@@ -101,13 +101,14 @@ ILI9225_kbv::ILI9225_kbv(int8_t cs, int8_t dc, int8_t rst):Adafruit_GFX(176, 220
     _rstpinmask = digitalPinToBitMask(_rst);
 }
 
-ILI9225_kbv::ILI9225_kbv(int8_t cs, int8_t dc, int8_t mosi, int8_t sclk, int8_t rst):Adafruit_GFX(176, 220)
+ILI9225_kbv::ILI9225_kbv(int8_t cs, int8_t dc, int8_t mosi, int8_t sclk, int8_t rst, int8_t led):Adafruit_GFX(176, 220)
 {
     _cs = cs;
 	_dc = dc;
 	_mosi = mosi;
 	_sclk = sclk; 
 	_rst = rst;
+	_led = led;
 	_hwspi = 0;
     _csport    = portOutputRegister(digitalPinToPort(_cs));
     _cspinmask = digitalPinToBitMask(_cs);
@@ -124,7 +125,8 @@ ILI9225_kbv::ILI9225_kbv(int8_t cs, int8_t dc, int8_t mosi, int8_t sclk, int8_t 
 void ILI9225_kbv::reset(void)
 {
     { CS_IDLE; RESET_IDLE; CS_OUTPUT; CD_OUTPUT; RESET_OUTPUT; }
-    if (_hwspi) {
+    if (_led) { pinMode(_led, OUTPUT); digitalWrite(_led, HIGH); }
+	if (_hwspi) {
 		SPI.begin();  //needed for AVR
 		SPI.beginTransaction(SPISettings(24000000, MSBFIRST, SPI_MODE0));
     } else {

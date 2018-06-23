@@ -18,9 +18,9 @@
 #include "Adafruit_GFX.h"// Hardware-specific library
 #include <ILI9225_kbv.h>
 
-ILI9225_kbv tft;       //hardware SPI default tft(10, 9, 8)
-//ILI9225_kbv tft(10, 9, 11, 13, 8); //software SPI.  no default.
-//ILI9225_kbv tft(A5, A3, A2, A1, A4); //software SPI.  no default.
+ILI9225_kbv tft;       //hardware SPI default tft(10, 9, 8) hard-wired LED
+//ILI9225_kbv tft(10, 9, 11, 13, 8, 0); //software SPI.  no default.
+//ILI9225_kbv tft(A5, A3, A2, A1, A4, A0); //software SPI.  no default.
 
 #define MCUFRIEND_KBV_H_ 100
 //#include <MCUFRIEND_kbv.h>
